@@ -5,9 +5,9 @@ resources:
  - repo: self
 
 variables:
- tag: $(Build.BuildId)
- FRONTEND_PORT: 3001
- BACKEND_PORT: 5001
+ - group: APP_IAC
+ - name: tag
+   value: $(Build.BuildId)
 
 stages:
  - stage: BuildAndPushBackend
@@ -83,7 +83,7 @@ stages:
            docker rm backend 2>/dev/null || true
            docker network inspect app_network >/dev/null 2>&1 || docker network create app_network
            echo "Running Docker container for backend"
-           docker run -d --name backend --network app_network -e DATABASE_URL=$(DATABASE_URL) -p 5001:5001 joelwekesa/backend:$(tag)
+           docker run -d --name backend --network app_network -e DATABASE_URL=$(DATABASE_URL) -p $(BACKEND_PORT):$(BACKEND_PORT) joelwekesa/backend:$(tag)
          displayName: Deploy Backend Container
          timeoutInMinutes: 20
 
@@ -106,6 +106,6 @@ stages:
            docker rm frontend 2>/dev/null || true
            docker network inspect app_network >/dev/null 2>&1 || docker network create app_network
            echo "Running Docker container for frontend"
-           docker run -d --name frontend --network app_network -p 3001:3001 joelwekesa/frontend:$(tag)
+           docker run -d --name frontend --network app_network -p $(FRONTEND_PORT):$(FRONTEND_PORT) joelwekesa/frontend:$(tag)
          displayName: Deploy Frontend Container
          timeoutInMinutes: 20
