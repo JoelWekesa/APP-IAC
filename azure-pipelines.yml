@@ -87,6 +87,18 @@ stages:
          displayName: Deploy Backend Container
          timeoutInMinutes: 20
 
+       - script: |
+          echo "Validating backend deployment"
+          curl -I http://localhost:$(BACKEND_PORT)
+          if [ $? -ne 0 ]; then
+            echo "Backend deployment validation failed"
+            exit 1
+          else
+            echo "Backend deployment validation succeeded"
+          fi
+         displayName: Validate Backend Deployment
+         timeoutInMinutes: '5'
+
  - stage: DeployToEC2Frontend
    displayName: Deploy Frontend to EC2 Instance
    jobs:
@@ -109,3 +121,15 @@ stages:
            docker run -d --name frontend --network app_network -p $(FRONTEND_PORT):$(FRONTEND_PORT) joelwekesa/frontend:$(tag)
          displayName: Deploy Frontend Container
          timeoutInMinutes: 20
+
+       - script: |
+          echo "Validating frontend deployment"
+          curl -I http://localhost:$(FRONTEND_PORT)
+          if [ $? -ne 0 ]; then
+            echo "Frontend deployment validation failed"
+            exit 1
+          else
+            echo "Frontend deployment validation succeeded"
+          fi
+         displayName: Validate Frontend Deployment
+         timeoutInMinutes: '5'
