@@ -1,171 +1,137 @@
 trigger:
- - main
+  - main
 
 resources:
- - repo: self
+  - repo: self
 
 variables:
- - group: APP_IAC
- - name: tag
-   value: $(Build.BuildId)
+  - group: APP_IAC
+  - name: tag
+    value: $(Build.BuildId)
 
 stages:
- - stage: BuildAndPushBackend
-   displayName: Build and Push Backend Docker Image
-   jobs:
-    - job: BuildAndPushBackendImage
-      displayName: Build and Push Backend Image
-      pool:
-       vmImage: ubuntu-latest
-      steps:
-       - script: |
-          echo "Building Docker image for backend with tag: $(tag)"
-          docker build --build-arg PORT=$(BACKEND_PORT) -f backend/Dockerfile -t joelwekesa/backend:$(tag) ./backend
-         displayName: Build Backend Docker Image
-         env:
-          DOCKER_BUILDKIT: 1
+  - stage: BuildAndPushBackend
+    displayName: Build and Push Backend Docker Image
+    jobs:
+      - job: BuildAndPushBackendImage
+        displayName: Build and Push Backend Image
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - script: |
+              echo "Building Docker image for backend with tag: $(tag)"
+              docker build --build-arg PORT=$(BACKEND_PORT) -f backend/Dockerfile -t joelwekesa/backend:$(tag) ./backend
+            displayName: Build Backend Docker Image
+            env:
+              DOCKER_BUILDKIT: 1
 
-       - task: Docker@2
-         inputs:
-          containerRegistry: 'docker'
-          repository: 'joelwekesa/backend'
-          command: 'push'
-          tags: '$(tag)'
+          - task: Docker@2
+            inputs:
+              containerRegistry: 'docker'
+              repository: 'joelwekesa/backend'
+              command: 'push'
+              tags: '$(tag)'
 
-       - script: |
-          echo "Docker images list after backend build:"
-          docker images
-         displayName: List Backend Docker Images
+          - script: |
+              echo "Docker images list after backend build:"
+              docker images
+            displayName: List Backend Docker Images
 
- - stage: BuildAndPushFrontend
-   displayName: Build and Push Frontend Docker Image
-   jobs:
-    - job: BuildAndPushFrontendImage
-      displayName: Build and Push Frontend Image
-      pool:
-       vmImage: ubuntu-latest
-      steps:
-       - script: |
-          echo "Building Docker image for frontend with tag: $(tag)"
-          docker build --build-arg PORT=$(FRONTEND_PORT) -f frontend/Dockerfile -t joelwekesa/frontend:$(tag) ./frontend
-         displayName: Build Frontend Docker Image
-         env:
-          DOCKER_BUILDKIT: 1
+  - stage: BuildAndPushFrontend
+    displayName: Build and Push Frontend Docker Image
+    jobs:
+      - job: BuildAndPushFrontendImage
+        displayName: Build and Push Frontend Image
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - script: |
+              echo "Building Docker image for frontend with tag: $(tag)"
+              docker build --build-arg PORT=$(FRONTEND_PORT) -f frontend/Dockerfile -t joelwekesa/frontend:$(tag) ./frontend
+            displayName: Build Frontend Docker Image
+            env:
+              DOCKER_BUILDKIT: 1
 
-       - task: Docker@2
-         inputs:
-          containerRegistry: 'docker'
-          repository: 'joelwekesa/frontend'
-          command: 'push'
-          tags: '$(tag)'
+          - task: Docker@2
+            inputs:
+              containerRegistry: 'docker'
+              repository: 'joelwekesa/frontend'
+              command: 'push'
+              tags: '$(tag)'
 
-       - script: |
-          echo "Docker images list after frontend build:"
-          docker images
-         displayName: List Frontend Docker Images
+          - script: |
+              echo "Docker images list after frontend build:"
+              docker images
+            displayName: List Frontend Docker Images
 
- - stage: DeployToEC2Backend
-   displayName: Deploy Backend to EC2 Instance
-   jobs:
-    - job: DeployBackendContainer
-      displayName: Deploy Backend Container to EC2
-      pool:
-       vmImage: ubuntu-latest
-      steps:
-       - task: SSH@0
-         inputs:
-          sshEndpoint: 'SIL'
-          runOptions: 'commands'
-          commands: |
+  - stage: DeployToEC2Backend
+    displayName: Deploy Backend to EC2 Instance
+    jobs:
+      - job: DeployBackendContainer
+        displayName: Deploy Backend Container to EC2
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: SSH@0
+            inputs:
+              sshEndpoint: 'SIL'
+              runOptions: 'commands'
+              commands: |
+                # Pull and start the backend container
+                docker pull joelwekesa/backend:$(tag)
+                docker stop backend 2>/dev/null || true
+                docker rm backend 2>/dev/null || true
+                docker network inspect app_network >/dev/null 2>&1 || docker network create app_network
+                docker run -d --name backend --network app_network -e DATABASE_URL=$(DATABASE_URL) -p $(BACKEND_PORT):$(BACKEND_PORT) joelwekesa/backend:$(tag)
 
-           docker pull joelwekesa/backend:$(tag)
-           docker stop backend 2>/dev/null || true
-           docker rm backend 2>/dev/null || true
-           docker network inspect app_network >/dev/null 2>&1 || docker network create app_network
-           docker run -d --name backend --network app_network -e DATABASE_URL=$(DATABASE_URL) -p $(BACKEND_PORT):$(BACKEND_PORT) joelwekesa/backend:$(tag)
+                # Health check for backend
+                echo "Checking if backend is running..."
+                for i in {1..12}; do
+                  if curl -s -f -I http://localhost:$(BACKEND_PORT) > /dev/null; then
+                    echo "Backend is up and running!"
+                    exit 0
+                  else
+                    echo "Backend not ready yet. Retrying in 10 seconds..."
+                    sleep 10
+                  fi
+                done
+                echo "Backend validation failed after 12 attempts."
+                exit 1
+            displayName: Deploy and Validate Backend Container
+            timeoutInMinutes: 20
 
+  - stage: DeployToEC2Frontend
+    displayName: Deploy Frontend to EC2 Instance
+    jobs:
+      - job: DeployFrontendContainer
+        displayName: Deploy Frontend Container to EC2
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: SSH@0
+            inputs:
+              sshEndpoint: 'SIL'
+              runOptions: 'commands'
+              commands: |
+                # Pull and start the frontend container
+                docker pull joelwekesa/frontend:$(tag)
+                docker stop frontend 2>/dev/null || true
+                docker rm frontend 2>/dev/null || true
+                docker network inspect app_network >/dev/null 2>&1 || docker network create app_network
+                docker run -d --name frontend --network app_network -p $(FRONTEND_PORT):$(FRONTEND_PORT) joelwekesa/frontend:$(tag)
 
-           cat << 'EOF' > healthcheck.sh
-           #!/bin/bash
-           MAX_RETRIES=12
-           RETRY_INTERVAL=10
-           retry_count=0
-           status=1
-
-           while [ $retry_count -lt $MAX_RETRIES ] && [ $status -ne 0 ]; do
-               echo "Attempt $((retry_count + 1)) of $MAX_RETRIES"
-               curl -s -f -I http://localhost:$(BACKEND_PORT) > /dev/null 2>&1
-               status=$?
-               if [ $status -eq 0 ]; then
-                   echo "Backend is up and running!"
-                   exit 0
-               else
-                   echo "Backend not ready yet. Waiting $RETRY_INTERVAL seconds..."
-                   sleep $RETRY_INTERVAL
-                   retry_count=$((retry_count + 1))
-               fi
-           done
-           echo "Backend validation failed after $MAX_RETRIES attempts"
-           exit 1
-           EOF
-
-           # Make script executable and run it
-           chmod +x healthcheck.sh
-           ./healthcheck.sh
-
-           rm healthcheck.sh
-         displayName: Deploy and Validate Backend Container
-         timeoutInMinutes: 20
-
- - stage: DeployToEC2Frontend
-   displayName: Deploy Frontend to EC2 Instance
-   jobs:
-    - job: DeployFrontendContainer
-      displayName: Deploy Frontend Container to EC2
-      pool:
-       vmImage: ubuntu-latest
-      steps:
-       - task: SSH@0
-         inputs:
-          sshEndpoint: 'SIL'
-          runOptions: 'commands'
-          commands: |
-           # Pull and start the container
-           docker pull joelwekesa/frontend:$(tag)
-           docker stop frontend 2>/dev/null || true
-           docker rm frontend 2>/dev/null || true
-           docker network inspect app_network >/dev/null 2>&1 || docker network create app_network
-           docker run -d --name frontend --network app_network -p $(FRONTEND_PORT):$(FRONTEND_PORT) joelwekesa/frontend:$(tag)
-
-           cat << 'EOF' > healthcheck.sh
-           #!/bin/bash
-           MAX_RETRIES=12
-           RETRY_INTERVAL=10
-           retry_count=0
-           status=1
-
-           while [ $retry_count -lt $MAX_RETRIES ] && [ $status -ne 0 ]; do
-               echo "Attempt $((retry_count + 1)) of $MAX_RETRIES"
-               curl -s -f -I http://localhost:$(FRONTEND_PORT) > /dev/null 2>&1
-               status=$?
-               if [ $status -eq 0 ]; then
-                   echo "Frontend is up and running!"
-                   exit 0
-               else
-                   echo "Frontend not ready yet. Waiting $RETRY_INTERVAL seconds..."
-                   sleep $RETRY_INTERVAL
-                   retry_count=$((retry_count + 1))
-               fi
-           done
-           echo "Frontend validation failed after $MAX_RETRIES attempts"
-           exit 1
-           EOF
-
-
-           chmod +x healthcheck.sh
-           ./healthcheck.sh
-
-
-           rm healthcheck.sh
-         displayName: Deploy and Validate Frontend Container
-         timeoutInMinutes: 20
+                # Health check for frontend
+                echo "Checking if frontend is running..."
+                for i in {1..12}; do
+                  if curl -s -f -I http://localhost:$(FRONTEND_PORT) > /dev/null; then
+                    echo "Frontend is up and running!"
+                    exit 0
+                  else
+                    echo "Frontend not ready yet. Retrying in 10 seconds..."
+                    sleep 10
+                  fi
+                done
+                echo "Frontend validation failed after 12 attempts."
+                exit 1
+            displayName: Deploy and Validate Frontend Container
+            timeoutInMinutes: 20
