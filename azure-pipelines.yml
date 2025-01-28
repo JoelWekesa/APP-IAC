@@ -75,52 +75,45 @@ stages:
        - task: SSH@0
          inputs:
           sshEndpoint: 'SIL'
-          runOptions: 'commands'
-          commands: |
-           echo "Pulling Docker image for backend: joelwekesa/backend:$(tag)"
-           docker pull joelwekesa/backend:$(tag)
-           docker stop backend 2>/dev/null || true
-           docker rm backend 2>/dev/null || true
-           docker network inspect app_network >/dev/null 2>&1 || docker network create app_network
-           echo "Running Docker container for backend"
-           docker run -d --name backend --network app_network -e DATABASE_URL=$(DATABASE_URL) -p $(BACKEND_PORT):$(BACKEND_PORT) joelwekesa/backend:$(tag)
-         displayName: Deploy Backend Container
+          runOptions: 'inline'
+          inline: |
+            echo "Pulling Docker image for backend: joelwekesa/backend:$(tag)"
+            docker pull joelwekesa/backend:$(tag)
+            docker stop backend 2>/dev/null || true
+            docker rm backend 2>/dev/null || true
+            docker network inspect app_network >/dev/null 2>&1 || docker network create app_network
+            echo "Running Docker container for backend"
+            docker run -d --name backend --network app_network -e DATABASE_URL=$(DATABASE_URL) -p $(BACKEND_PORT):$(BACKEND_PORT) joelwekesa/backend:$(tag)
+            
+            echo "Starting backend health check with retry mechanism..."
+            MAX_RETRIES=12
+            RETRY_INTERVAL=10
+            retry_count=0
+            status=1
+
+            while [ $retry_count -lt $MAX_RETRIES ] && [ $status -ne 0 ]; do
+                echo "Attempt $((retry_count + 1)) of $MAX_RETRIES"
+                curl -s -f -I http://localhost:$(BACKEND_PORT) > /dev/null
+                status=$?
+                
+                if [ $status -eq 0 ]; then
+                    echo "Backend is up and running!"
+                    break
+                else
+                    echo "Backend not ready yet. Waiting $RETRY_INTERVAL seconds..."
+                    sleep $RETRY_INTERVAL
+                    retry_count=$((retry_count + 1))
+                fi
+            done
+
+            if [ $status -ne 0 ]; then
+                echo "Backend validation failed after $MAX_RETRIES attempts"
+                exit 1
+            fi
+
+            echo "Backend validation succeeded"
+         displayName: Deploy and Validate Backend Container
          timeoutInMinutes: 20
-
-       - script: |
-          MAX_RETRIES=12 
-          RETRY_INTERVAL=10 
-          ENDPOINT="http://localhost:$(BACKEND_PORT)"
-          retry_count=0
-          status=1
-
-          echo "Starting backend health check with retry mechanism..."
-
-          while [ $retry_count -lt $MAX_RETRIES ] && [ $status -ne 0 ]; do
-              echo "Attempt $((retry_count + 1)) of $MAX_RETRIES - Checking $ENDPOINT"
-              
-              # Try to connect to the backend
-              curl -s -f -I "$ENDPOINT" > /dev/null
-              status=$?
-              
-              if [ $status -eq 0 ]; then
-                  echo "Backend is up and running!"
-                  break
-              else
-                  echo "Backend not ready yet. Waiting $RETRY_INTERVAL seconds before next attempt..."
-                  sleep $RETRY_INTERVAL
-                  retry_count=$((retry_count + 1))
-              fi
-          done
-
-          if [ $status -ne 0 ]; then
-              echo "Backend validation failed after $MAX_RETRIES attempts"
-              exit 1
-          fi
-
-          echo "Backend validation succeeded"
-          exit 0
-         displayName: Validate Backend Deployment
 
  - stage: DeployToEC2Frontend
    displayName: Deploy Frontend to EC2 Instance
@@ -133,49 +126,42 @@ stages:
        - task: SSH@0
          inputs:
           sshEndpoint: 'SIL'
-          runOptions: 'commands'
-          commands: |
-           echo "Pulling Docker image for frontend: joelwekesa/frontend:$(tag)"
-           docker pull joelwekesa/frontend:$(tag)
-           docker stop frontend 2>/dev/null || true
-           docker rm frontend 2>/dev/null || true
-           docker network inspect app_network >/dev/null 2>&1 || docker network create app_network
-           echo "Running Docker container for frontend"
-           docker run -d --name frontend --network app_network -p $(FRONTEND_PORT):$(FRONTEND_PORT) joelwekesa/frontend:$(tag)
-         displayName: Deploy Frontend Container
+          runOptions: 'inline'
+          inline: |
+            echo "Pulling Docker image for frontend: joelwekesa/frontend:$(tag)"
+            docker pull joelwekesa/frontend:$(tag)
+            docker stop frontend 2>/dev/null || true
+            docker rm frontend 2>/dev/null || true
+            docker network inspect app_network >/dev/null 2>&1 || docker network create app_network
+            echo "Running Docker container for frontend"
+            docker run -d --name frontend --network app_network -p $(FRONTEND_PORT):$(FRONTEND_PORT) joelwekesa/frontend:$(tag)
+            
+            echo "Starting frontend health check with retry mechanism..."
+            MAX_RETRIES=12
+            RETRY_INTERVAL=10
+            retry_count=0
+            status=1
+
+            while [ $retry_count -lt $MAX_RETRIES ] && [ $status -ne 0 ]; do
+                echo "Attempt $((retry_count + 1)) of $MAX_RETRIES"
+                curl -s -f -I http://localhost:$(FRONTEND_PORT) > /dev/null
+                status=$?
+                
+                if [ $status -eq 0 ]; then
+                    echo "Frontend is up and running!"
+                    break
+                else
+                    echo "Frontend not ready yet. Waiting $RETRY_INTERVAL seconds..."
+                    sleep $RETRY_INTERVAL
+                    retry_count=$((retry_count + 1))
+                fi
+            done
+
+            if [ $status -ne 0 ]; then
+                echo "Frontend validation failed after $MAX_RETRIES attempts"
+                exit 1
+            fi
+
+            echo "Frontend validation succeeded"
+         displayName: Deploy and Validate Frontend Container
          timeoutInMinutes: 20
-
-       - script: |
-          MAX_RETRIES=12
-          RETRY_INTERVAL=10
-          ENDPOINT="http://localhost:$(FRONTEND_PORT)"
-          retry_count=0
-          status=1
-
-          echo "Starting frontend health check with retry mechanism..."
-
-          while [ $retry_count -lt $MAX_RETRIES ] && [ $status -ne 0 ]; do
-              echo "Attempt $((retry_count + 1)) of $MAX_RETRIES - Checking $ENDPOINT"
-              
-              # Try to connect to the frontend
-              curl -s -f -I "$ENDPOINT" > /dev/null
-              status=$?
-              
-              if [ $status -eq 0 ]; then
-                  echo "Frontend is up and running!"
-                  break
-              else
-                  echo "Frontend not ready yet. Waiting $RETRY_INTERVAL seconds before next attempt..."
-                  sleep $RETRY_INTERVAL
-                  retry_count=$((retry_count + 1))
-              fi
-          done
-
-          if [ $status -ne 0 ]; then
-              echo "Frontend validation failed after $MAX_RETRIES attempts"
-              exit 1
-          fi
-
-          echo "Frontend validation succeeded"
-          exit 0
-         displayName: Validate Frontend Deployment
