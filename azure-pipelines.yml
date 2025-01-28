@@ -1,0 +1,111 @@
+trigger:
+ - main
+
+resources:
+ - repo: self
+
+variables:
+ tag: $(Build.BuildId)
+ FRONTEND_PORT: 3001
+ BACKEND_PORT: 5001
+
+stages:
+ - stage: BuildAndPushBackend
+   displayName: Build and Push Backend Docker Image
+   jobs:
+    - job: BuildAndPushBackendImage
+      displayName: Build and Push Backend Image
+      pool:
+       vmImage: ubuntu-latest
+      steps:
+       - script: |
+          echo "Building Docker image for backend with tag: $(tag)"
+          docker build --build-arg PORT=$(BACKEND_PORT) -f backend/Dockerfile -t joelwekesa/backend:$(tag) ./backend
+         displayName: Build Backend Docker Image
+         env:
+          DOCKER_BUILDKIT: 1
+
+       - task: Docker@2
+         inputs:
+          containerRegistry: 'docker'
+          repository: 'joelwekesa/backend'
+          command: 'push'
+          tags: '$(tag)'
+
+       - script: |
+          echo "Docker images list after backend build:"
+          docker images
+         displayName: List Backend Docker Images
+
+ - stage: BuildAndPushFrontend
+   displayName: Build and Push Frontend Docker Image
+   jobs:
+    - job: BuildAndPushFrontendImage
+      displayName: Build and Push Frontend Image
+      pool:
+       vmImage: ubuntu-latest
+      steps:
+       - script: |
+          echo "Building Docker image for frontend with tag: $(tag)"
+          docker build --build-arg PORT=$(FRONTEND_PORT) -f frontend/Dockerfile -t joelwekesa/frontend:$(tag) ./frontend
+         displayName: Build Frontend Docker Image
+         env:
+          DOCKER_BUILDKIT: 1
+
+       - task: Docker@2
+         inputs:
+          containerRegistry: 'docker'
+          repository: 'joelwekesa/frontend'
+          command: 'push'
+          tags: '$(tag)'
+
+       - script: |
+          echo "Docker images list after frontend build:"
+          docker images
+         displayName: List Frontend Docker Images
+
+ - stage: DeployToEC2Backend
+   displayName: Deploy Backend to EC2 Instance
+   jobs:
+    - job: DeployBackendContainer
+      displayName: Deploy Backend Container to EC2
+      pool:
+       vmImage: ubuntu-latest
+      steps:
+       - task: SSH@0
+         inputs:
+          sshEndpoint: 'SIL'
+          runOptions: 'commands'
+          commands: |
+           echo "Pulling Docker image for backend: joelwekesa/backend:$(tag)"
+           docker pull joelwekesa/backend:$(tag)
+           docker stop backend 2>/dev/null || true
+           docker rm backend 2>/dev/null || true
+           docker network inspect app_network >/dev/null 2>&1 || docker network create app_network
+           echo "Running Docker container for backend"
+           docker run -d --name backend --network app_network -e DATABASE_URL=$(DATABASE_URL) -p 5001:5001 joelwekesa/backend:$(tag)
+         displayName: Deploy Backend Container
+         timeoutInMinutes: 20
+
+ - stage: DeployToEC2Frontend
+   displayName: Deploy Frontend to EC2 Instance
+   jobs:
+    - job: DeployFrontendContainer
+      displayName: Deploy Frontend Container to EC2
+      pool:
+       vmImage: ubuntu-latest
+      steps:
+       - task: SSH@0
+         inputs:
+          sshEndpoint: 'SIL'
+          runOptions: 'commands'
+          commands: |
+           echo "Pulling Docker image for frontend: joelwekesa/frontend:$(tag)"
+           docker pull joelwekesa/frontend:$(tag)
+           docker stop frontend 2>/dev/null || true
+           docker rm frontend 2>/dev/null || true
+           docker network inspect app_network >/dev/null 2>&1 || docker network create app_network
+           echo "Running Docker container for frontend"
+           docker run -d --name frontend --network app_network -p 3001:3001 joelwekesa/frontend:$(tag)
+         displayName: Deploy Frontend Container
+         timeoutInMinutes: 20
