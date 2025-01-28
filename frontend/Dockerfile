@@ -4,6 +4,7 @@ FROM node:${NODE_VERSION}-slim AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 ENV NODE_ENV=production
+ENV PORT=3001
 
 RUN corepack enable
 
@@ -36,6 +37,7 @@ COPY --from=builder --chown=nextjs:nodejs /frontend/.next/static ./.next/static
 RUN chown nextjs:nodejs .next
 
 USER nextjs
+
 
 EXPOSE 3001
 

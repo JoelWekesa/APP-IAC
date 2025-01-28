@@ -1,0 +1,33 @@
+services:
+ web:
+  build:
+   context: ./frontend
+  ports:
+   - 3001:3001
+
+  depends_on:
+   - api
+
+  networks:
+   - app-network
+
+ api:
+  build:
+   context: ./backend
+  env_file:
+   - ./backend/.env
+  ports:
+   - 5001:5001
+  volumes:
+   - dev-db-data:/app/prisma
+
+  networks:
+   - app-network
+
+volumes:
+ dev-db-data:
+  driver: local
+
+networks:
+ app-network:
+  driver: bridge
