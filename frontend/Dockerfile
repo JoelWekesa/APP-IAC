@@ -3,7 +3,7 @@ FROM node:${NODE_VERSION}-slim AS base
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-ENV NODE_ENV=production
+ENV BUILD_STANDALONE=true
 ENV PORT=3001
 
 RUN corepack enable
