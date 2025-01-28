@@ -97,7 +97,7 @@ stages:
             echo "Backend deployment validation succeeded"
           fi
          displayName: Validate Backend Deployment
-         timeoutInMinutes: '5'
+         timeoutInMinutes: 5
 
  - stage: DeployToEC2Frontend
    displayName: Deploy Frontend to EC2 Instance
@@ -132,4 +132,4 @@ stages:
             echo "Frontend deployment validation succeeded"
           fi
          displayName: Validate Frontend Deployment
-         timeoutInMinutes: '5'
+         timeoutInMinutes: 5
