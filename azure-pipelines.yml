@@ -90,13 +90,6 @@ stages:
          displayName: Install Pulumi CLI
 
        - script: |
-          echo "Setting up AWS credentials..."
-          export AWS_ACCESS_KEY_ID="$(AWS_ACCESS_KEY_ID)"
-          export AWS_SECRET_ACCESS_KEY="$(AWS_SECRET_ACCESS_KEY)"
-          export PUBLIC_KEY="$(PUBLIC_KEY)"
-         displayName: Configure AWS Credentials
-
-       - script: |
           echo "Navigating to the iac folder..."
           cd iac
           echo "Installing Pulumi dependencies..."
@@ -110,6 +103,10 @@ stages:
          displayName: Deploy Infrastructure with Pulumi
          env:
             PULUMI_ACCESS_TOKEN: $(PULUMI_ACCESS_TOKEN)
+            AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+            AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+            PUBLIC_KEY: $(PUBLIC_KEY)
+
 
  - stage: DeployToEC2Backend
    displayName: Deploy Backend to EC2 Instance
