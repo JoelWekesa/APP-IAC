@@ -127,7 +127,7 @@ stages:
             docker network inspect app_network >/dev/null 2>&1 || docker network create app_network
             docker run -d --name backend --network app_network -e DATABASE_URL=$(DATABASE_URL) -p $(BACKEND_PORT):$(BACKEND_PORT) joelwekesa/backend:$(tag)
 
-         displayName: Deploy and Validate Backend Container
+         displayName: Deploy Backend Container
          timeoutInMinutes: 20
 
  - stage: DeployToEC2Frontend
@@ -149,5 +149,5 @@ stages:
             docker network inspect app_network >/dev/null 2>&1 || docker network create app_network
             docker run -d --name frontend --network app_network -p $(FRONTEND_PORT):$(FRONTEND_PORT) joelwekesa/frontend:$(tag)
 
-         displayName: Deploy and Validate Frontend Container
+         displayName: Deploy Frontend Container
          timeoutInMinutes: 20
