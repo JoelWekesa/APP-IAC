@@ -85,14 +85,14 @@ stages:
 
        - script: |
           echo "Setting up AWS credentials..."
-          export AWS_ACCESS_KEY_ID=$(AWS_ACCESS_KEY_ID)
-          export AWS_SECRET_ACCESS_KEY=$(AWS_SECRET_ACCESS_KEY)
-          export PUBLIC_KEY=$(PUBLIC_KEY)
+          export AWS_ACCESS_KEY_ID="$(AWS_ACCESS_KEY_ID)"
+          export AWS_SECRET_ACCESS_KEY="$(AWS_SECRET_ACCESS_KEY)"
+          export PUBLIC_KEY="$(PUBLIC_KEY)"
          displayName: Configure AWS Credentials
 
        - script: |
           echo "Setting up Pulumi access token..."
-          export PULUMI_ACCESS_TOKEN=$(PULUMI_ACCESS_TOKEN)
+          export PULUMI_ACCESS_TOKEN="$(PULUMI_ACCESS_TOKEN)"
          displayName: Configure Pulumi Access Token
 
        - script: |
