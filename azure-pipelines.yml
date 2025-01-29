@@ -64,6 +64,50 @@ stages:
           docker images
          displayName: List Frontend Docker Images
 
+ - stage: ProvisionInfrastructure
+   displayName: Provision AWS Infrastructure with Pulumi
+   jobs:
+    - job: ProvisionInfrastructure
+      displayName: Provision Infrastructure
+      pool:
+       vmImage: ubuntu-latest
+      steps:
+       - task: UseNode@1
+         inputs:
+          version: $(NODE_VERSION)
+
+       - script: |
+          echo "Installing Pulumi CLI..."
+          curl -fsSL https://get.pulumi.com | sh
+          export PATH=$PATH:$HOME/.pulumi/bin
+          pulumi version
+         displayName: Install Pulumi CLI
+
+       - script: |
+          echo "Setting up AWS credentials..."
+          export AWS_ACCESS_KEY_ID=$(AWS_ACCESS_KEY_ID)
+          export AWS_SECRET_ACCESS_KEY=$(AWS_SECRET_ACCESS_KEY)
+          export PUBLIC_KEY=$(PUBLIC_KEY)
+         displayName: Configure AWS Credentials
+
+       - script: |
+          echo "Setting up Pulumi access token..."
+          export PULUMI_ACCESS_TOKEN=$(PULUMI_ACCESS_TOKEN)
+         displayName: Configure Pulumi Access Token
+
+       - script: |
+          echo "Navigating to the iac folder..."
+          cd iac
+          echo "Installing Pulumi dependencies..."
+          pnpm install
+         displayName: Install Pulumi Dependencies
+
+       - script: |
+          echo "Deploying infrastructure with Pulumi..."
+          cd iac
+          pulumi up --stack dev --yes
+         displayName: Deploy Infrastructure with Pulumi
+
  - stage: DeployToEC2Backend
    displayName: Deploy Backend to EC2 Instance
    jobs:
