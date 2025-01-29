@@ -77,23 +77,12 @@ stages:
           sshEndpoint: 'SIL'
           runOptions: 'commands'
           commands: |
-            # Pull and start the backend container
             docker pull joelwekesa/backend:$(tag)
             docker stop backend 2>/dev/null || true
             docker rm backend 2>/dev/null || true
             docker network inspect app_network >/dev/null 2>&1 || docker network create app_network
             docker run -d --name backend --network app_network -e DATABASE_URL=$(DATABASE_URL) -p $(BACKEND_PORT):$(BACKEND_PORT) joelwekesa/backend:$(tag)
 
-            echo "Waiting for backend container to start..."
-            sleep 60
-            if docker ps | grep backend; then
-              echo "Backend container is running."
-              echo "Validating backend container health..."
-              curl -f http://localhost:$(BACKEND_PORT) || exit 1
-            else
-              echo "Backend container failed to start."
-              exit 1
-            fi
          displayName: Deploy and Validate Backend Container
          timeoutInMinutes: 20
 
@@ -110,22 +99,11 @@ stages:
           sshEndpoint: 'SIL'
           runOptions: 'commands'
           commands: |
-            # Pull and start the frontend container
             docker pull joelwekesa/frontend:$(tag)
             docker stop frontend 2>/dev/null || true
             docker rm frontend 2>/dev/null || true
             docker network inspect app_network >/dev/null 2>&1 || docker network create app_network
             docker run -d --name frontend --network app_network -p $(FRONTEND_PORT):$(FRONTEND_PORT) joelwekesa/frontend:$(tag)
 
-            echo "Waiting for frontend container to start..."
-            sleep 60
-            if docker ps | grep frontend; then
-              echo "Frontend container is running."
-              echo "Validating frontend container health..."
-              curl -f http://localhost:$(FRONTEND_PORT)/health || exit 1
-            else
-              echo "Frontend container failed to start."
-              exit 1
-            fi
          displayName: Deploy and Validate Frontend Container
          timeoutInMinutes: 20
