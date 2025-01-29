@@ -97,11 +97,6 @@ stages:
          displayName: Configure AWS Credentials
 
        - script: |
-          echo "Setting up Pulumi access token..."
-          export PULUMI_ACCESS_TOKEN="$(PULUMI_ACCESS_TOKEN)"
-         displayName: Configure Pulumi Access Token
-
-       - script: |
           echo "Navigating to the iac folder..."
           cd iac
           echo "Installing Pulumi dependencies..."
@@ -113,6 +108,8 @@ stages:
           cd iac
           pulumi up --stack dev --yes
          displayName: Deploy Infrastructure with Pulumi
+         env:
+            PULUMI_ACCESS_TOKEN: $(PULUMI_ACCESS_TOKEN)
 
  - stage: DeployToEC2Backend
    displayName: Deploy Backend to EC2 Instance
