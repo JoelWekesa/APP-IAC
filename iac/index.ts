@@ -101,6 +101,56 @@ new ec2.SecurityGroupRule('sil-sg-allow-https', {
 })
 
 
+new ec2.SecurityGroupRule('sil-sg-allow-portainer', {
+    type: 'ingress',
+    fromPort: 9443,
+    toPort: 9443,
+    protocol: 'tcp',
+    cidrBlocks: ['0.0.0.0/0'],
+    securityGroupId: sg.id,
+});
+
+new ec2.SecurityGroupRule('sil-sg-allow-grafana', {
+    type: 'ingress',
+    fromPort: 3000,
+    toPort: 3000,
+    protocol: 'tcp',
+    cidrBlocks: ['0.0.0.0/0'],
+    securityGroupId: sg.id,
+});
+
+
+new ec2.SecurityGroupRule('sil-sg-allow-backend', {
+    type: 'ingress',
+    fromPort: 5001,
+    toPort: 5001,
+    protocol: 'tcp',
+    cidrBlocks: ['0.0.0.0/0'],
+    securityGroupId: sg.id,
+})
+
+
+new ec2.SecurityGroupRule('sil-sg-allow-frontend', {
+    type: 'ingress',
+    fromPort: 3001,
+    toPort: 3001,
+    protocol: 'tcp',
+    cidrBlocks: ['0.0.0.0/0'],
+    securityGroupId: sg.id,
+})
+
+
+new ec2.SecurityGroupRule('sil-sg-allow-proxy', {
+    type: 'ingress',
+    fromPort: 81,
+    toPort: 81,
+    protocol: 'tcp',
+    cidrBlocks: ['0.0.0.0/0'],
+    securityGroupId: sg.id,
+})
+
+
+
 new ec2.SecurityGroupRule("pulumi-init-sg-all-egress", {
     securityGroupId: sg.id,
     type: "egress",
